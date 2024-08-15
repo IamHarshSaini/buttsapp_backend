@@ -5,7 +5,7 @@ module.exports = function (app) {
 
   app.get("/", (req, res)=> {
     res.send({
-      message: "server is running"
+      message: `server is running on port ${process.env.PORT}`
     })
   })
 };

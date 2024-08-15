@@ -1,12 +1,13 @@
-'use strict';
-const mongoose = require('mongoose');
+"use strict";
+const mongoose = require("mongoose");
 
-var url = process.env.MongoUrl;
-
-var mongoConn = mongoose.connect(url).then(() => {
+const connection = mongoose
+  .connect(process.env.DB_URL)
+  .then(() => {
     console.log("Database Connected");
-}).catch((err) => {
+  })
+  .catch((err) => {
     console.log(err);
-})
+  });
 
-module.exports = mongoConn;
+module.exports = connection;

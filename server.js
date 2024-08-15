@@ -1,3 +1,4 @@
+const db = require("./db");
 const http = require("http");
 const cors = require("cors");
 const scoket = require("./socket");

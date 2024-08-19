@@ -1,28 +1,45 @@
+let io;
 const socketIO = require("socket.io");
-let io, socketInfo;
+const { jwtDecode } = require("jwt-decode");
 
-const newUserConnected = () => {
-  console.log(`new user connected ${socketInfo?.id}`);
-};
+let userList = {};
 
-const sendMessage = (message) => {
-  io.emit("message", message);
-};
-
-const scoket = (socket) => {
+const scoketFnc = (socket) => {
   // new user connected
-  newUserConnected(socket);
+  const { userName, email } = socket["user"];
 
-  // setting global socket info
-  socketInfo = socket;
+  userList[email] = socket.id;
+  console.log(`${userName} Connected`);
 
   // events
-  socket.on("sendMessage", sendMessage);
+  socket.on("sendMessage", ({ email, message }) => {
+    io.to(userList[email]).emit("message", message);
+  });
 
   // disconnect event
   socket.on("disconnect", () => {
-    console.log("user disconnected");
+    console.log(`${userName} DisConnected`);
   });
+};
+
+const middleware = (socket, next) => {
+  try {
+    if (socket?.handshake?.query?.token) {
+      const decoded = jwtDecode(socket.handshake.query.token);
+      if (decoded?.email) {
+        socket["user"] = decoded;
+        socket["user"]["socketID"] = socket.id;
+        next();
+      } else {
+        throw "not authorized";
+      }
+    }
+  } catch (error) {
+    console.log(error);
+    const err = new Error("not authorized");
+    err.data = { content: "Please login first" };
+    next(err);
+  }
 };
 
 module.exports = (server) => {
@@ -31,5 +48,6 @@ module.exports = (server) => {
       origin: "*", // app URL
     },
   });
-  io.on("connection", scoket);
+  io.use(middleware);
+  io.on("connection", scoketFnc);
 };

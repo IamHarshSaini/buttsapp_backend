@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
-    dp: { type: String },
+    lastSeen: Date.now(),
+    avatar: { type: String },
     password: { type: String },
     lastSeen: { type: String },
-    isSocial: { type: String },
-    username: { type: String, required: true },
+    isSocial: { type: Boolean },
+    userName: { type: String, required: true },
+    isVerified: { type: Boolean, default: false },
     email: { type: String, required: true, unique: true },
   },
   {

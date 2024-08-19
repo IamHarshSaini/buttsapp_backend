@@ -1,8 +1,10 @@
 const db = require("./db");
 const http = require("http");
 const cors = require("cors");
+const morgan = require("morgan");
 const scoket = require("./socket");
 const express = require("express");
+const { jwtDecode } = require("jwt-decode");
 
 const PORT = process.env.PORT || 8080;
 const routes = require("./app/routes/index");
@@ -14,9 +16,25 @@ const server = http.createServer(app);
 // socket
 scoket(server);
 
-// express
+// express and cors
 app.use(cors());
 app.use(express.json());
+
+// middleware
+app.use((req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    let token = jwtDecode(authHeader);
+    req.user = token;
+  } catch (error) {
+    // console.error("Failed to decode token:", error.message);
+    // return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+});
+
+// morgan for logs
+app.use(morgan("tiny"));
 
 // handle routes
 routes(app);

@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
 const services = require("../services/auth");
-// const { jwtDecode } = require("jwt-decode");
 
 const {
   verfiyGithub,
@@ -9,6 +8,14 @@ const {
 } = require("../../api.service");
 
 const controller = {
+  get: async function (req, res) {
+    try {
+      const users = await services.get(req);
+      res.send(users);
+    } catch (error) {
+      res.send(error);
+    }
+  },
   register: async function (req, res) {
     try {
       // return services.add(req);
@@ -56,6 +63,8 @@ const controller = {
           let { access_token, ...rest } = await verfiyGithub(code);
           if (access_token) {
             let gitUserDeatils = await githubUserDeatil(access_token);
+            if (!gitUserDeatils?.email)
+              throw "Please first add your email in your github profile before continue";
             let userDeatils = await services.add({
               body: getGitUserPayload(gitUserDeatils),
             });
@@ -79,9 +88,10 @@ const controller = {
 
 const getGitUserPayload = (details) => {
   return {
-    username: details.name,
+    isSocial: true,
     email: details.email,
-    dp: details.avatar_url,
+    userName: details.name,
+    avatar: details.avatar_url,
   };
 };
 

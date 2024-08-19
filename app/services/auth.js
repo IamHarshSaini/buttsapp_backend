@@ -2,17 +2,24 @@ const userModel = require("../models/User");
 
 const services = {
   get: async function (req) {
-    return [{ name: "harsh", lastName: "saini" }];
+    let users = await userModel
+      .find({ _id: { $ne: req.user._id } })
+      .select({ avatar: 1, userName: 1, email: 1, isSocial: 1 });
+    return users;
   },
   add: async function (req) {
     try {
       const { body } = req;
-      let user = await userModel.findOne({ email: body.email });
+      if (!body?.email) throw "email is required!";
+      let user = await userModel
+        .findOne({ email: body.email })
+        .select({ userName: 1, email: 1, avatar: 1, isSocial: 1 });
       if (user) {
         return user;
       } else {
         let newUser = new userModel(body);
-        return await newUser.save();
+        await newUser.save();
+        return { ...body, _id: newUser._id };
       }
     } catch (error) {
       throw error;

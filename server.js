@@ -4,7 +4,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const scoket = require("./socket");
 const express = require("express");
-const { jwtDecode } = require("jwt-decode");
+const { jwtDecode } = require("./common/constant");
 
 const PORT = process.env.PORT || 8080;
 const routes = require("./app/routes/index");
@@ -24,8 +24,7 @@ app.use(express.json());
 app.use((req, res, next) => {
   try {
     const authHeader = req.headers["authorization"];
-    let token = jwtDecode(authHeader);
-    req.user = token;
+    req.user = jwtDecode(authHeader);
   } catch (error) {
     // console.error("Failed to decode token:", error.message);
     // return res.status(401).json({ message: "Unauthorized" });

@@ -1,5 +1,5 @@
-const jwt = require("jsonwebtoken");
 const services = require("../services/auth");
+const { jwtEncode } = require("../../common/constant");
 
 const {
   verfiyGithub,
@@ -68,7 +68,7 @@ const controller = {
             let userDeatils = await services.add({
               body: getGitUserPayload(gitUserDeatils),
             });
-            token = createJwtToken(userDeatils);
+            token = jwtEncode(userDeatils);
             res.cookie("jwt", token);
             res.send({
               token,
@@ -93,11 +93,6 @@ const getGitUserPayload = (details) => {
     userName: details.name,
     avatar: details.avatar_url,
   };
-};
-
-const createJwtToken = (details) => {
-  let token = jwt.sign(JSON.stringify(details), "shhhhh");
-  return token;
 };
 
 module.exports = controller;

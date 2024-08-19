@@ -1,20 +1,34 @@
 let io;
 const socketIO = require("socket.io");
-const { jwtDecode } = require("jwt-decode");
+const controller = require("../app/controllers/message.js");
+const { jwtDecode } = require("../common/constant.js");
 
 let userList = {};
 
 const scoketFnc = (socket) => {
   // new user connected
-  const { userName, email } = socket["user"];
+  const { userName, _id } = socket["user"];
 
-  userList[email] = socket.id;
+  userList[_id] = socket.id;
   console.log(`${userName} Connected`);
 
   // events
-  socket.on("sendMessage", ({ email, message }) => {
-    io.to(userList[email]).emit("message", message);
+  socket.on("sendMessage", async ({ id, message }) => {
+    io.to(userList[id]).emit("message", message);
+    await controller.add({
+      body: {
+        sender: _id,
+        receiver: id,
+        content: message,
+      },
+    });
   });
+
+  // socket.on("getUserChat", id, async (e) => {
+  //   let msg = await Message.find();
+  //   console.log(id);
+  //   e(msg);
+  // });
 
   // disconnect event
   socket.on("disconnect", () => {
@@ -28,7 +42,6 @@ const middleware = (socket, next) => {
       const decoded = jwtDecode(socket.handshake.query.token);
       if (decoded?.email) {
         socket["user"] = decoded;
-        socket["user"]["socketID"] = socket.id;
         next();
       } else {
         throw "not authorized";

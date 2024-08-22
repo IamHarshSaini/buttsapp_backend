@@ -1,5 +1,5 @@
-const jwt = require("jsonwebtoken");
-const { jwtDecode } = require("jwt-decode");
+const jwt = require('jsonwebtoken');
+const { jwtDecode } = require('jwt-decode');
 
 exports.jwtDecode = (token) => {
   try {
@@ -11,8 +11,25 @@ exports.jwtDecode = (token) => {
 
 exports.jwtEncode = (details) => {
   try {
-    return jwt.sign(JSON.stringify(details), "shh");
+    return jwt.sign(JSON.stringify(details), 'shh');
   } catch (error) {
     return error;
   }
 };
+
+exports.tryCatch =
+  (fnc) =>
+  (...args) => {
+    try {
+      return fnc(...args);
+    } catch (error) {
+      if (args?.[1]) {
+        args?.[1]?.send({
+          error: true,
+          message: error.message || error,
+        });
+      } else {
+        return error?.message || 'server not working';
+      }
+    }
+  };

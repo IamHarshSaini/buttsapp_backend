@@ -1,38 +1,54 @@
 let io;
-const socketIO = require("socket.io");
-const controller = require("../app/controllers/message.js");
-const { jwtDecode } = require("../common/constant.js");
+const socketIO = require('socket.io');
+const { jwtDecode } = require('../common/constant.js');
+const { chatMessage } = require('../app/services/chat.js');
+const { setOnlineOrOffline, getAll } = require('../app/services/auth.js');
 
 let userList = {};
 
-const scoketFnc = (socket) => {
+const scoketFnc = async (socket) => {
   // new user connected
-  const { userName, _id } = socket["user"];
-
+  const { name, _id } = socket['user'];
   userList[_id] = socket.id;
-  console.log(`${userName} Connected`);
+  console.log(`${name} Connected`);
+  await setOnlineOrOffline(_id, true);
 
-  // events
-  socket.on("sendMessage", async ({ id, message }) => {
-    io.to(userList[id]).emit("message", message);
-    await controller.add({
-      body: {
-        sender: _id,
-        receiver: id,
-        content: message,
-      },
-    });
+  // sendMessage
+  socket.on('sendMessage', async ({ id, message }) => {
+    // if (userList?.[id]) {
+    //   io.to(userList[id]).emit("message", message);
+    // }
+    // await controller.add({
+    //   body: {
+    //     sender: _id,
+    //     receiver: id,
+    //     content: message,
+    //   },
+    // });
   });
 
-  // socket.on("getUserChat", id, async (e) => {
-  //   let msg = await Message.find();
-  //   console.log(id);
-  //   e(msg);
-  // });
+  // chatMessages
+  socket.on('chatMessages', async (id, callback) => {
+    // let chatMessages = chatMessage(_id, id);
+    callback([]);
+  });
+
+  // chatList
+  socket.on('chatList', async (callBack) => {
+    // let list = await authServices.get(_id);
+    callBack([]);
+  });
+
+  socket.on('getAllUserList', async (callBack) => {
+    let list = await getAll(_id);
+    callBack(list);
+  });
 
   // disconnect event
-  socket.on("disconnect", () => {
-    console.log(`${userName} DisConnected`);
+  socket.on('disconnect', async () => {
+    console.log(`${name} DisConnected`);
+    await setOnlineOrOffline(_id, false);
+    delete userList[_id];
   });
 };
 
@@ -41,16 +57,16 @@ const middleware = (socket, next) => {
     if (socket?.handshake?.query?.token) {
       const decoded = jwtDecode(socket.handshake.query.token);
       if (decoded?.email) {
-        socket["user"] = decoded;
+        socket['user'] = decoded;
         next();
       } else {
-        throw "not authorized";
+        throw 'not authorized';
       }
     }
   } catch (error) {
     console.log(error);
-    const err = new Error("not authorized");
-    err.data = { content: "Please login first" };
+    const err = new Error('not authorized');
+    err.data = { content: 'Please login first' };
     next(err);
   }
 };
@@ -58,9 +74,9 @@ const middleware = (socket, next) => {
 module.exports = (server) => {
   io = socketIO(server, {
     cors: {
-      origin: "*", // app URL
+      origin: '*', // app URL
     },
   });
   io.use(middleware);
-  io.on("connection", scoketFnc);
+  io.on('connection', scoketFnc);
 };

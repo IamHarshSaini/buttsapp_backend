@@ -1,18 +1,24 @@
 const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
-const userSchema = new mongoose.Schema(
+const userSchema = new Schema(
   {
-    lastSeen: Date.now(),
-    avatar: { type: String },
-    password: { type: String },
-    lastSeen: { type: String },
     isSocial: { type: Boolean },
-    userName: { type: String, required: true },
+    password: { type: String },
+    name: { type: String, required: true },
+    lastSeen: { type: Date, default: Date.now },
+    isOnline: { type: Boolean, default: false },
+    phoneNumber: { type: String, unique: false },
     isVerified: { type: Boolean, default: false },
+    profilePicture: { type: String, default: null },
     email: { type: String, required: true, unique: true },
+    groups: [{ type: Schema.Types.ObjectId, ref: "Group" }],
+    contacts: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    about: { type: String, default: "Hey there! I am using WhatsApp." },
   },
   {
     timestamps: true,
+    versionKey: false,
   }
 );
 

@@ -1,13 +1,13 @@
-const db = require("./db");
-const http = require("http");
-const cors = require("cors");
-const morgan = require("morgan");
-const scoket = require("./socket");
-const express = require("express");
-const { jwtDecode } = require("./common/constant");
+const db = require('./db');
+const http = require('http');
+const cors = require('cors');
+const morgan = require('morgan');
+const scoket = require('./socket');
+const express = require('express');
 
 const PORT = process.env.PORT || 8080;
-const routes = require("./app/routes/index");
+const routes = require('./app/routes/index');
+const { tryCatch } = require('./common/constant');
 
 // app
 const app = express();
@@ -20,20 +20,8 @@ scoket(server);
 app.use(cors());
 app.use(express.json());
 
-// middleware
-app.use((req, res, next) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    req.user = jwtDecode(authHeader);
-  } catch (error) {
-    // console.error("Failed to decode token:", error.message);
-    // return res.status(401).json({ message: "Unauthorized" });
-  }
-  next();
-});
-
 // morgan for logs
-app.use(morgan("tiny"));
+app.use(morgan('tiny'));
 
 // handle routes
 routes(app);
@@ -47,7 +35,19 @@ server.listen(PORT, (err) => {
   }
 });
 
-// for urls whiteList
+// middleware
+// app.use((req, res, next) => {
+//   try {
+//     const authHeader = req.headers["authorization"];
+//     req.user = jwtDecode(authHeader);
+//   } catch (error) {
+//     console.error("Failed to decode token:", error.message);
+//     return res.status(401).json({ message: "Unauthorized" });
+//   }
+//   next();
+// });
+
+// url whiteList
 // let whiteList = ['https://sainiharsh.netlify.app/', 'http://localhost:5173'];
 // app.use(cors({
 //     origin: function (origin, callback) {
@@ -60,11 +60,6 @@ server.listen(PORT, (err) => {
 //     }, credentials: true
 // }));
 
+// static file visible
 // app.use(express.static(__dirname + "/public"));
 // app.use(express.static("public"));
-
-// logs
-// app.use(function (req, res, next) {
-//   console.log(req.url);
-//   next();
-// });

@@ -1,10 +1,11 @@
-"use strict";
-const mongoose = require("mongoose");
+'use strict';
+require('dotenv').config();
+const mongoose = require('mongoose');
 
 const connection = mongoose
   .connect(process.env.DB_URL)
   .then(() => {
-    console.log("Database Connected");
+    console.log('Database Connected');
   })
   .catch((err) => {
     console.log(err);

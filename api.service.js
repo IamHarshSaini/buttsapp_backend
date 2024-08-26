@@ -1,4 +1,5 @@
-const axios = require("axios");
+require('dotenv').config();
+const axios = require('axios');
 
 // Add a request interceptor
 axios.interceptors.request.use(
@@ -26,7 +27,7 @@ exports.githubUrl = function () {
 
 exports.verfiyGithub = async (code) => {
   return await axios.post(
-    "https://github.com/login/oauth/access_token",
+    'https://github.com/login/oauth/access_token',
     {
       client_id: process.env.GITHUB_C_ID,
       client_secret: process.env.GITHUB_C_SEC,
@@ -34,14 +35,14 @@ exports.verfiyGithub = async (code) => {
     },
     {
       headers: {
-        Accept: "application/json",
+        Accept: 'application/json',
       },
     }
   );
 };
 
 exports.githubUserDeatil = async function (accessToken) {
-  return await axios.get("https://api.github.com/user", {
+  return await axios.get('https://api.github.com/user', {
     headers: {
       Authorization: `token ${accessToken}`,
     },

@@ -48,8 +48,7 @@ exports.setOnlineOrOffline = tryCatch(async (id, status) => {
     }
     await userModel.findByIdAndUpdate(id, body);
   } catch (error) {
-    console.log(error.message);
-    return error.message;
+    return error;
   }
 });
 

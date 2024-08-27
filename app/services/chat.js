@@ -1,6 +1,6 @@
 const ChatModel = require('../models/Chat');
 const { tryCatch } = require('../../common/constant');
-const { addNewUserToContactList, getUserById } = require('./auth');
+const { addNewUserToContactList } = require('./auth');
 const { sendMessage, getChatMessage } = require('./message');
 
 exports.chatMessage = tryCatch(async (senderId, receiverId) => {
@@ -25,8 +25,6 @@ exports.sendOneToOneMessage = tryCatch(async (userId, receiverId, message, type)
 });
 
 exports.chatList = tryCatch(async (id) => {
-  let userDeatils = await getUserById(id);
-  if (userDeatils) {
-    let { contacts } = userDeatils;
-  }
+  let chatsList = await ChatModel.find({ members: id }).populate('members').populate("lastMessage");
+  return chatsList;
 });

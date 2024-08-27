@@ -31,8 +31,7 @@ const scoketFnc = async (socket) => {
   // chatList
   socket.on('chatList', async (callBack) => {
     let list = await chatList(_id);
-    console.log(list)
-    callBack([]);
+    callBack(list || []);
   });
 
   // all users list

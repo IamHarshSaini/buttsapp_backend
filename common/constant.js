@@ -19,17 +19,22 @@ exports.jwtEncode = (details) => {
 
 exports.tryCatch =
   (fnc) =>
-  (...args) => {
+  async (...args) => {
     try {
-      return fnc(...args);
+      return await fnc(...args);
     } catch (error) {
-      if (args?.[1]) {
-        args?.[1]?.send({
+      console.log({
+        error: true,
+        message: error.message || error,
+      });
+      const [, response] = args;
+      if (response && typeof response.send === 'function') {
+        response.send({
           error: true,
           message: error.message || error,
         });
       } else {
-        return error?.message || 'server not working';
+        return error.message || 'Server not working';
       }
     }
   };

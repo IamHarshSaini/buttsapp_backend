@@ -27,7 +27,6 @@ exports.socialVerify = tryCatch(async (req, res) => {
   let token = null;
 
   const getGitUserPayload = (details) => {
-    debugger;
     return {
       isSocial: true,
       email: details.email,

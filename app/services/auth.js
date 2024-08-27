@@ -16,6 +16,12 @@ exports.getAll = tryCatch(async function (id) {
   }
 });
 
+exports.getUserById = tryCatch(async (id) => {
+  let user = await userModel.find({ _id: id });
+  if (user?.length > 0) return user[0];
+  throw 'user not found by id';
+});
+
 exports.add = tryCatch(async function (body) {
   // if email is not found
   if (!body?.email) throw 'email is required!';
@@ -48,29 +54,25 @@ exports.setOnlineOrOffline = tryCatch(async (id, status) => {
 });
 
 exports.addNewUserToContactList = tryCatch(async (userId, contactId) => {
-  try {
-    // make sure both users exist
-    const currentUser = await userModel.findById(userId);
-    const newContact = await userModel.findById(contactId);
+  // make sure both users exist
+  const currentUser = await userModel.findById(userId);
+  const newContact = await userModel.findById(contactId);
 
-    if (!currentUser || !newContact) {
-      return 'User not found';
-    }
-
-    // Check if the contact is already in the list
-    if (currentUser.contacts.includes(contactId)) {
-      return 'User is already in contacts';
-    }
-
-    // Add the new contact to the current user's contact list
-    currentUser.contacts.push(contactId);
-    await currentUser.save();
-
-    return {
-      message: 'Contact added successfully',
-      contacts: currentUser.contacts,
-    };
-  } catch (error) {
-    return error.message;
+  if (!currentUser || !newContact) {
+    return 'User not found';
   }
+
+  // Check if the contact is already in the list
+  if (currentUser.contacts.includes(contactId)) {
+    return 'User is already in contacts';
+  }
+
+  // Add the new contact to the current user's contact list
+  currentUser.contacts.push(contactId);
+  await currentUser.save();
+
+  return {
+    message: 'Contact added successfully',
+    contacts: currentUser.contacts,
+  };
 });

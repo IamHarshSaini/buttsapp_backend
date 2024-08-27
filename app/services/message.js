@@ -1,22 +1,26 @@
-const Message = require("../models/Message");
+const { tryCatch } = require('../../common/constant');
+const Message = require('../models/Message');
+const Chat = require('../models/Chat');
 
-const services = {
-  get: async (req) => {
-    const { receiver, sender } = req.query;
-    let msgs = await Message.find({
-      $or: [
-        { sender: sender, receiver: receiver },
-        { receiver: sender, sender: receiver },
-      ],
-    })
-      .sort({ createdAt: -1 })
-      .limit(10);
-    return msgs;
-  },
-  add: async (body) => {
-    let msg = new Message(body);
-    return await msg.save();
-  },
-};
+// Send a message
+exports.sendMessage = tryCatch(async (body) => {
+  const { senderId, chatId, content, type } = body;
+  const message = new Message({
+    sender: senderId,
+    chat: chatId,
+    content,
+    type,
+  });
+  await message.save();
 
-module.exports = services;
+  // Update lastMessage in Chat
+  await Chat.findByIdAndUpdate(chatId, { lastMessage: message._id });
+
+  return message;
+});
+
+exports.getChatMessage = tryCatch(async (chatId) => {
+  let msgs = await Message.find({ chat: chatId }).sort({ createdAt: -1 });
+  if (msgs) return msgs;
+  return [];
+});

@@ -1,8 +1,9 @@
 let io;
 const socketIO = require('socket.io');
 const { jwtDecode } = require('../common/constant.js');
+const { sendMessage } = require('../app/services/message.js');
+const { chatMessage, chatList } = require('../app/services/chat.js');
 const { setOnlineOrOffline, getAll } = require('../app/services/auth.js');
-const { chatMessage, sendOneToOneMessage, chatList } = require('../app/services/chat.js');
 
 let userList = {};
 
@@ -15,7 +16,7 @@ const scoketFnc = async (socket) => {
 
   // sendMessage
   socket.on('sendMessage', async (message, id, type, call) => {
-    let msg = await sendOneToOneMessage(_id, id, message, type);
+    let msg = await sendMessage({ senderId: _id, chatId: id, content: message, type: type || 'text' });
     call(msg);
     if (userList?.[id]) {
       io.to(userList[id]).emit('message', msg);
@@ -24,7 +25,7 @@ const scoketFnc = async (socket) => {
 
   // chatMessages
   socket.on('chatMessages', async (id, callback) => {
-    let chatMessages = await chatMessage(_id, id);
+    let chatMessages = await chatMessage({ senderId: _id, receiverId: id, chatId: id });
     callback(chatMessages || []);
   });
 

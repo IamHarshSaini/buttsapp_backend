@@ -1,30 +1,45 @@
 const ChatModel = require('../models/Chat');
+const { getChatMessage } = require('./message');
 const { tryCatch } = require('../../common/constant');
 const { addNewUserToContactList } = require('./auth');
-const { sendMessage, getChatMessage } = require('./message');
 
-exports.chatMessage = tryCatch(async (senderId, receiverId) => {
-  let chat = await ChatModel.find({ members: receiverId });
-  if (chat?.length > 0) {
-    return getChatMessage(chat?.[0]._id);
+exports.chatMessage = tryCatch(async ({ senderId, receiverId, chatId }) => {
+  let chat = await ChatModel.findOne({ _id: chatId });
+  if (chat) {
+    return await getChatMessage(chatId);
   } else {
-    return [];
-  }
-});
-
-exports.sendOneToOneMessage = tryCatch(async (userId, receiverId, message, type) => {
-  await addNewUserToContactList(userId, receiverId);
-  let chat = await ChatModel.find({ members: receiverId });
-  if (chat.length > 0) {
-    return await sendMessage({ senderId: userId, chatId: chat[0]._id, content: message, type: type || 'text' });
-  } else {
-    let newChat = await new ChatModel({ members: [userId, receiverId] });
+    await addNewUserToContactList(senderId, receiverId);
+    let newChat = new ChatModel({ members: [senderId, receiverId] });
     await newChat.save();
-    return await sendMessage({ senderId: userId, chatId: newChat._id, content: message, type: type || 'text' });
+    let selectedChat = await ChatModel.findOne({ _id: newChat?._id }).populate({
+      path: 'members',
+      select: ['name', 'profilePicture'],
+      match: { _id: { $ne: senderId } },
+    });
+    return selectedChat;
   }
 });
 
 exports.chatList = tryCatch(async (id) => {
-  let chatsList = await ChatModel.find({ members: id }).populate('members').populate("lastMessage");
+  let chatsList = await ChatModel.find({ members: id })
+    .populate({
+      path: 'members',
+      select: ['name', 'profilePicture'],
+      match: { _id: { $ne: id } },
+    })
+    .populate({
+      path: 'lastMessage',
+      select: ['status', 'type', 'content', 'createdAt'],
+      populate: {
+        path: 'sender',
+        select: ['name'],
+      },
+    })
+    .populate('group', ['groupPicture', 'name'])
+    .populate({
+      path: 'unreadCounts',
+      select: ['name', 'profilePicture'],
+      match: { _id: { $ne: id } },
+    });
   return chatsList;
 });

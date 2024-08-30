@@ -2,7 +2,7 @@ let io;
 const socketIO = require('socket.io');
 const { jwtDecode } = require('../common/constant.js');
 const { sendMessage } = require('../app/services/message.js');
-const { chatMessage, chatList } = require('../app/services/chat.js');
+const { chatMessage, chatList, createNewChat } = require('../app/services/chat.js');
 const { setOnlineOrOffline, getAll } = require('../app/services/auth.js');
 
 let userList = {};
@@ -24,14 +24,21 @@ const scoketFnc = async (socket) => {
   });
 
   // chatMessages
-  socket.on('chatMessages', async (id, callback) => {
-    let chatMessages = await chatMessage({ senderId: _id, receiverId: id, chatId: id });
+  socket.on('getChatMessages', async (receiverId, callback) => {
+    let chatMessages = await chatMessage({ senderId: _id, receiverId });
     callback(chatMessages || []);
+  });
+
+  socket.on('createNewChat', async (receiverId, callBack) => {
+    let result = await createNewChat(_id, receiverId);
+    callBack(result);
   });
 
   // chatList
   socket.on('chatList', async (callBack) => {
     let list = await chatList(_id);
+
+    console.log(list)
     callBack(list || []);
   });
 

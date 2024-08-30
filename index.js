@@ -8,6 +8,7 @@ const express = require('express');
 const PORT = process.env.PORT || 8080;
 const routes = require('./app/routes/index');
 const { tryCatch } = require('./common/constant');
+const Group = require('./app/models/Group');
 
 // app
 const app = express();
@@ -27,7 +28,7 @@ app.use(morgan('tiny'));
 routes(app);
 
 // server
-server.listen(PORT, (err) => {
+server.listen(PORT,async (err) => {
   if (err) {
     console.log(err);
   } else {

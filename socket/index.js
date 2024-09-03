@@ -1,9 +1,9 @@
 let io;
 const socketIO = require('socket.io');
 const { jwtDecode } = require('../common/constant.js');
-const { sendMessage } = require('../app/services/message.js');
-const { chatMessage, chatList, createNewChat } = require('../app/services/chat.js');
-const { setOnlineOrOffline, getAll } = require('../app/services/auth.js');
+const { chatList, createNewChat } = require('../app/services/chat.js');
+const { sendMessage, getChatMessage } = require('../app/services/message.js');
+const { setOnlineOrOffline, getAll, getUserContacts } = require('../app/services/auth.js');
 
 let userList = {};
 
@@ -12,23 +12,32 @@ const scoketFnc = async (socket) => {
   const { name, _id } = socket['user'];
   userList[_id] = socket.id;
   console.log(`${name} Connected`);
-  await setOnlineOrOffline(_id, true);
+
+  // update user status
+  let { contacts } = await getUserContacts(_id);
+  let useDetails = await setOnlineOrOffline(_id, true);
+  contacts.forEach(user => {
+    if (userList[user]) {
+      io.to(userList[user]).emit('userStatusUpdate', { userId: _id, info: useDetails });
+    }
+  });
 
   // sendMessage
-  socket.on('sendMessage', async (message, id, type, call) => {
-    let msg = await sendMessage({ senderId: _id, chatId: id, content: message, type: type || 'text' });
+  socket.on('sendMessage', async ({ message, chatId, type, receiverId }, call) => {
+    let msg = await sendMessage({ senderId: _id, chatId, content: message, type });
     call(msg);
-    if (userList?.[id]) {
-      io.to(userList[id]).emit('message', msg);
+    if (userList?.[receiverId]) {
+      io.to(userList[receiverId]).emit('message', msg);
     }
   });
 
   // chatMessages
-  socket.on('getChatMessages', async (receiverId, callback) => {
-    let chatMessages = await chatMessage({ senderId: _id, receiverId });
+  socket.on('getChatMessages', async (id, callback) => {
+    let chatMessages = await getChatMessage(id);
     callback(chatMessages || []);
   });
 
+  // create new chat
   socket.on('createNewChat', async (receiverId, callBack) => {
     let result = await createNewChat(_id, receiverId);
     callBack(result);
@@ -37,8 +46,6 @@ const scoketFnc = async (socket) => {
   // chatList
   socket.on('chatList', async (callBack) => {
     let list = await chatList(_id);
-
-    console.log(list)
     callBack(list || []);
   });
 
@@ -51,8 +58,16 @@ const scoketFnc = async (socket) => {
   // disconnect event
   socket.on('disconnect', async () => {
     console.log(`${name} DisConnected`);
-    await setOnlineOrOffline(_id, false);
     delete userList[_id];
+
+    // update user status
+    let { contacts } = await getUserContacts(_id);
+    let useDetails = await setOnlineOrOffline(_id, true);
+    contacts.forEach(user => {
+      if (userList[user]) {
+        io.to(userList[user]).emit('userStatusUpdate', { userId: _id, info: useDetails });
+      }
+    });
   });
 };
 

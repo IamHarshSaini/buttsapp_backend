@@ -1,59 +1,75 @@
-const mongoose = require('mongoose');
 const ChatModel = require('../models/Chat');
 const { getChatMessage } = require('./message');
 const { tryCatch } = require('../../common/constant');
 const { addNewUserToContactList } = require('./auth');
 
-exports.chatMessage = tryCatch(async ({ senderId, receiverId }) => {
-  // if (chatId) {
-  //   return await getChatMessage(chatId);
-  // } else {
-  //   await addNewUserToContactList(senderId, receiverId);
-  //   let newChat = new ChatModel({ members: [senderId, receiverId] });
-  //   await newChat.save();
-  //   let newUserChat = await ChatModel.findOne({ _id: newChat?._id }).populate({
-  //     path: 'members',
-  //     select: ['name', 'profilePicture'],
-  //     match: { _id: { $ne: senderId } },
-  //   });
-  //   return newUserChat;
-  // }
-});
-
 exports.createNewChat = tryCatch(async (senderId, receiverId) => {
   const existingChat = await ChatModel.findOne({
     isGroup: false,
     members: { $all: [senderId, receiverId], $size: 2 },
-  });
+  })
+    .select('isGroup lastMessage, unreadCounts')
+    .populate({
+      path: 'members',
+      select: ['name', 'profilePicture', 'isOnline', 'lastSeen'],
+      match: { _id: { $ne: senderId } },
+    })
+    .populate({
+      path: 'unreadCounts',
+      select: ['name', 'profilePicture'],
+      match: { _id: { $ne: senderId } },
+    })
+    .exec();
   if (existingChat) {
+    let chatInfo = existingChat.toObject();
+    if (!chatInfo?.isGroup) {
+      chatInfo['chatMember'] = chatInfo['members'][0];
+    }
+    delete chatInfo['members'];
     let messages = await getChatMessage(existingChat._id);
+
     return {
-      chat: existingChat,
+      chat: chatInfo,
       messages: messages,
     };
   } else {
-    let newChat = new ChatModel({ members: [senderId, receiverId] });
-    await newChat.save();
-    let newChatResponse = await ChatModel.findOne({ _id: newChat?._id }).populate({
-      path: 'members',
-      select: ['name', 'profilePicture'],
-      match: { _id: { $ne: senderId } },
-    });
+    addNewUserToContactList(senderId, receiverId);
+    addNewUserToContactList(receiverId, senderId);
+    let chatInfo = await new ChatModel({ members: [senderId, receiverId] }).save().then((newChat) =>
+      ChatModel.findOne({ _id: newChat._id })
+        .select('isGroup lastMessage unreadCounts')
+        .populate({
+          path: 'members',
+          select: ['name', 'profilePicture', 'isOnline', 'lastSeen'],
+          match: { _id: { $ne: senderId } },
+        })
+        .populate({
+          path: 'unreadCounts',
+          select: ['name', 'profilePicture'],
+          match: { _id: { $ne: senderId } },
+        })
+        .exec()
+    );
+
+    if (!chatInfo?.isGroup) {
+      chatInfo['chatMember'] = chatInfo['members'][0];
+    }
+    delete chatInfo['members'];
 
     return {
-      chat: newChatResponse,
+      chat: chatInfo,
       messages: [],
     };
   }
 });
 
 exports.chatList = tryCatch(async (id) => {
-  // lastMessage: { $ne: null }
-  let chatsList = await ChatModel.find({ members: id })
+  let chatsList = await ChatModel.find({ members: id, lastMessage: { $ne: null } })
+    .select('isGroup lastMessage, unreadCounts')
     .populate({
       path: 'members',
-      select: ['name', 'profilePicture'],
-      match: { _id: { $ne: id }, isGroup: false },
+      select: ['name', 'profilePicture', 'isOnline', 'lastSeen'],
+      match: { _id: { $ne: id } },
     })
     .populate({
       path: 'lastMessage',
@@ -61,19 +77,27 @@ exports.chatList = tryCatch(async (id) => {
       populate: {
         path: 'sender',
         select: ['name'],
-        match: { isGroup: true },
       },
     })
     .populate({
       path: 'group',
       select: ['groupPicture', 'name'],
-      match: { isGroup: true },
     })
     .populate({
       path: 'unreadCounts',
       select: ['name', 'profilePicture'],
       match: { _id: { $ne: id } },
-    });
+    })
+    .exec();
 
-  return chatsList;
+  let transformedChatsList = chatsList.map((item) => {
+    let obj = item.toObject();
+    if (!obj?.isGroup) {
+      obj['chatMember'] = obj['members'][0];
+    }
+    delete obj['members'];
+    return obj;
+  });
+
+  return transformedChatsList;
 });

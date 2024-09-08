@@ -17,6 +17,27 @@ exports.jwtEncode = (details) => {
   }
 };
 
+exports.socketMiddleware = (socket, next) => {
+  try {
+    if (socket?.handshake?.query?.token) {
+      const decoded = jwtDecode(socket.handshake.query.token);
+      if (decoded?.email) {
+        socket['user'] = decoded;
+        next();
+      } else {
+        throw new Error('not authorized');
+      }
+    } else {
+      throw new Error('not authorized');
+    }
+  } catch (error) {
+    console.log(error);
+    const err = new Error('not authorized');
+    err.data = { content: 'Please login first' };
+    next(err);
+  }
+};
+
 exports.tryCatch =
   (fnc) =>
   async (...args) => {

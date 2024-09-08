@@ -5,19 +5,13 @@ let userSelect = '-isVerified -createdAt -updatedAt -contacts -groups';
 exports.getAll = tryCatch(async function (id) {
   try {
     if (id) {
-      return users = await userModel.find({ _id: { $ne: id } }).select(userSelect);
+      return (users = await userModel.find({ _id: { $ne: id } }).select(userSelect));
     } else {
-      return users = await userModel.find().select(userSelect);
+      return (users = await userModel.find().select(userSelect));
     }
   } catch (error) {
     return error.message;
   }
-});
-
-exports.getUserById = tryCatch(async (id) => {
-  let user = await userModel.find({ _id: id });
-  if (user?.length > 0) return user[0];
-  throw 'user not found by id';
 });
 
 exports.add = tryCatch(async function (body) {
@@ -63,6 +57,6 @@ exports.addNewUserToContactList = tryCatch(async (userId, contactId) => {
   };
 });
 
-exports.getUserContacts = tryCatch(async(id)=> {
-  return contacts = await userModel.findOne({ _id: id }).select('contacts');
+exports.getUserContacts = tryCatch(async (id) => {
+  return (contacts = await userModel.findOne({ _id: id }).select('contacts'));
 });

@@ -10,11 +10,6 @@ const MessageSchema = new Schema(
       enum: ["text", "image", "video", "audio", "document"],
       default: "text",
     },
-    status: {
-      type: String,
-      enum: ["sent", "delivered", "read"],
-      default: "sent",
-    },
     chat: { type: Schema.Types.ObjectId, ref: "Chat", required: true },
     deliveredTo: [
       {

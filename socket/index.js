@@ -1,6 +1,9 @@
 const socketIO = require("socket.io");
 const { socketMiddleware } = require("../common/constant.js");
 
+// redis
+// const { setUser, getUser, removeUser } = require("../db/redis");
+
 const {
   chatList,
   updateChat,
@@ -22,34 +25,30 @@ const {
 } = require("../app/services/message.js");
 
 let io;
-let userList = {};
 
 // Handle user connection and disconnection
 const handleUserConnectionAndDisconnection = async (socket, status) => {
-  const { _id, name } = socket.user;
-
-  if (status) {
-    userList[_id] = socket.id;
-    console.log(`${name} Connected`);
-  } else {
-    delete userList[_id];
-    console.log(`${name} Disconnected`);
-  }
-
   try {
+    const { _id, name } = socket.user;
+    if (status) {
+      // setUser(_id, socket.id);
+      console.log(`${name} Connected`);
+    } else {
+      // removeUser(_id);
+      console.log(`${name} Disconnected`);
+    }
     // Update user status and notify contacts
-    const { contacts } = await getUserContacts(_id);
-    await setOnlineOrOffline(_id, status);
-
-    contacts.forEach((contact) => {
-      if (userList[contact]) {
-        io.to(userList[contact]).emit("userStatusUpdate", {
-          userId: _id,
-          status: status,
-          lastSeen: Date.now(),
-        });
-      }
-    });
+    // const { contacts } = await getUserContacts(_id);
+    // await setOnlineOrOffline(_id, status);
+    // contacts.forEach((contact) => {
+    //   if (userList[contact]) {
+    //     io.to(userList[contact]).emit("userStatusUpdate", {
+    //       userId: _id,
+    //       status: status,
+    //       lastSeen: Date.now(),
+    //     });
+    //   }
+    // });
   } catch (e) {}
 };
 
@@ -134,12 +133,12 @@ const handleConnections = (socket) => {
 
   // Bind socket events to handlers
   socket.on("chatList", handleChatList(socket));
-  socket.on("sendMessage", handleSendMessage(socket));
-  socket.on("createNewChat", handleCreateNewChat(socket));
+  // socket.on("sendMessage", handleSendMessage(socket));
+  // socket.on("createNewChat", handleCreateNewChat(socket));
   socket.on("getAllUserList", handleGetAllUserList(socket));
-  socket.on("getChatMessages", handleGetChatMessages(socket));
-  socket.on("markAsRead", handleMarkAsRead(socket));
-  socket.on("markAllAsRead", handleMarkAllAsRead(socket));
+  // socket.on("getChatMessages", handleGetChatMessages(socket));
+  // socket.on("markAsRead", handleMarkAsRead(socket));
+  // socket.on("markAllAsRead", handleMarkAllAsRead(socket));
 
   // Handle disconnection event
   socket.on("disconnect", () =>

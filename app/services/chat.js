@@ -47,41 +47,51 @@ exports.createNewChat = tryCatch(async (senderId, receiverId) => {
 });
 
 exports.chatList = tryCatch(async (id) => {
-  let chatsList = await ChatModel.find({
-    members: id,
-    lastMessage: { $ne: null },
-  })
-    .select("isGroup lastMessage, unreadCounts")
-    .populate({
-      path: "members unreadCounts",
-      select: ["name", "profilePicture", "isOnline", "lastSeen"],
-      match: { _id: { $ne: id } },
-    })
-    .populate({
-      path: "lastMessage",
-      select: ["status", "type", "content", "createdAt"],
-      populate: {
-        path: "sender",
-        select: ["name"],
+  // let chatsList = await ChatModel.find({
+  //   members: id,
+  //   lastMessage: { $ne: null },
+  // })
+  //   .select("isGroup lastMessage, unreadCounts")
+  //   .populate({
+  //     path: "members unreadCounts",
+  //     select: ["name", "profilePicture", "isOnline", "lastSeen"],
+  //     match: { _id: { $ne: id } },
+  //   })
+  //   .populate({
+  //     path: "lastMessage",
+  //     select: ["status", "type", "content", "createdAt"],
+  //     populate: {
+  //       path: "sender",
+  //       select: ["name"],
+  //     },
+  //   })
+  //   .populate({
+  //     path: "group",
+  //     select: ["groupPicture", "name"],
+  //   })
+  //   .sort({ updatedAt: -1 })
+  //   .exec();
+
+  // let transformedChatsList = chatsList.map((item) => {
+  //   let obj = item.toObject();
+  //   if (!obj?.isGroup) {
+  //     obj["chatMember"] = obj["members"][0];
+  //   }
+  //   delete obj["members"];
+  //   return obj;
+  // });
+
+  // return transformedChatsList;
+
+  let chatLists = await ChatModel.aggregate([
+    {
+      $match: {
+        members: id,
+        lastMessage: { $ne: null },
       },
-    })
-    .populate({
-      path: "group",
-      select: ["groupPicture", "name"],
-    })
-    .sort({ updatedAt: -1 })
-    .exec();
-
-  let transformedChatsList = chatsList.map((item) => {
-    let obj = item.toObject();
-    if (!obj?.isGroup) {
-      obj["chatMember"] = obj["members"][0];
-    }
-    delete obj["members"];
-    return obj;
-  });
-
-  return transformedChatsList;
+    },
+  ]);
+  return chatLists;
 });
 
 exports.updateChat = tryCatch(async (chatId, senderId, messageId) => {

@@ -1,14 +1,11 @@
 const socketIO = require("socket.io");
+const redis = require("../db/redis");
 const { socketMiddleware } = require("../common/constant.js");
-
-// redis
-// const { setUser, getUser, removeUser } = require("../db/redis");
 
 const {
   chatList,
-  updateChat,
   createNewChat,
-  findChatByIdAndExcludeUserById,
+  updateChatLastMessages,
 } = require("../app/services/chat.js");
 
 const {
@@ -31,64 +28,62 @@ const handleUserConnectionAndDisconnection = async (socket, status) => {
   try {
     const { _id, name } = socket.user;
     if (status) {
-      // setUser(_id, socket.id);
+      await redis.set(_id, socket.id);
       console.log(`${name} Connected`);
     } else {
-      // removeUser(_id);
+      await redis.del(_id);
       console.log(`${name} Disconnected`);
     }
     // Update user status and notify contacts
-    // const { contacts } = await getUserContacts(_id);
-    // await setOnlineOrOffline(_id, status);
-    // contacts.forEach((contact) => {
-    //   if (userList[contact]) {
-    //     io.to(userList[contact]).emit("userStatusUpdate", {
-    //       userId: _id,
-    //       status: status,
-    //       lastSeen: Date.now(),
-    //     });
+    const contacts = await getUserContacts(_id);
+    await setOnlineOrOffline(_id, status);
+
+    const lastSeen = Date.now();
+    // const contactPromises = contacts.map(async (contact) => {
+    //   try {
+    //     const isUserOnline = await redis.get(contact);
+    //     if (isUserOnline) {
+    //       io.to(isUserOnline).emit("userStatusUpdate", {
+    //         userId: _id,
+    //         status: status,
+    //         lastSeen: lastSeen,
+    //       });
+    //     }
+    //   } catch (err) {
+    //     console.error(`Error notifying contact ${contact}:`, err);
     //   }
     // });
-  } catch (e) {}
+    // await Promise.all(contactPromises);
+  } catch (e) {
+    console.log(e);
+  }
 };
 
 // Handle sending messages
 const handleSendMessage = (socket) => async (data, callback) => {
   const { _id } = socket.user;
-  const { message: content, chatId, type, receiverId } = data;
-  const message = await sendMessage({
+  const { message: content, chatId, type, receiverId, isGroup } = data;
+  let message = await sendMessage({
     senderId: _id,
     chatId,
     content,
     type,
   });
-  const updatedChat = await updateChat(chatId, _id, message._id);
 
-  if (userList[receiverId]) {
-    const updatedChatForReceiver = await findChatByIdAndExcludeUserById(
-      chatId,
-      receiverId
-    );
-    const updatedMessage = await markAsDelivered(message._id, receiverId);
-    io.to(userList[receiverId]).emit("message", {
-      message,
-      updatedChat: updatedChatForReceiver,
-    });
-
-    callback({
-      message: updatedMessage,
-      updatedChat,
-    });
+  if (!isGroup) {
+    if (await redis.get(receiverId)) {
+      message = await markAsDelivered(message._id, receiverId);
+    }
   } else {
-    callback({
-      message,
-      updatedChat,
-    });
   }
+
+  const updatedChat = await updateChatLastMessages(chatId, message._id);
+  io.to(chatId).emit("message", { message, updatedChat });
 };
 
 // Handle retrieving chat messages
 const handleGetChatMessages = (socket) => async (chatId, callback) => {
+  socket.join(chatId);
   const chatMessages = await getChatMessage(chatId);
   callback(chatMessages || []);
 };
@@ -133,10 +128,10 @@ const handleConnections = (socket) => {
 
   // Bind socket events to handlers
   socket.on("chatList", handleChatList(socket));
-  // socket.on("sendMessage", handleSendMessage(socket));
+  socket.on("sendMessage", handleSendMessage(socket));
   // socket.on("createNewChat", handleCreateNewChat(socket));
   socket.on("getAllUserList", handleGetAllUserList(socket));
-  // socket.on("getChatMessages", handleGetChatMessages(socket));
+  socket.on("getChatMessages", handleGetChatMessages(socket));
   // socket.on("markAsRead", handleMarkAsRead(socket));
   // socket.on("markAllAsRead", handleMarkAllAsRead(socket));
 

@@ -2,7 +2,6 @@ const db = require('./db');
 const http = require('http');
 const cors = require('cors');
 const morgan = require('morgan');
-const redis = require("./db/redis")
 const scoket = require('./socket');
 const express = require('express');
 

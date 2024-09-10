@@ -1,16 +1,37 @@
-const redis = require('redis');
+const redis = require("redis");
 
-// Create a new Redis client instance with default settings
-const client = redis.createClient({
-  url: 'redis://localhost:6379' // URL format for Redis connection
-});
+let client = null;
 
-// Listen for the 'connect' event
-client.on('connect', () => {
-  console.log('Connected to Redis');
-});
+const initializeRedisClient = () => {
+  if (!client) {
+    client = redis.createClient({
+      url: "redis://localhost:6379",
+    });
 
-// Listen for the 'error' event
-client.on('error', (err) => {
-  console.error('Redis error:', err);
-});
+    client.on("connect", () => {
+      console.log("Connected to Redis");
+    });
+
+    client.on("error", (err) => {
+      console.error("Redis error:", err);
+    });
+
+    client.on("reconnecting", () => {
+      console.log("Reconnecting to Redis...");
+    });
+
+    client.on("end", () => {
+      console.log("Redis client disconnected");
+    });
+  }
+
+  if (!client.isOpen) {
+    client.connect().catch((err) => {
+      console.error("Failed to connect to Redis:", err);
+    });
+  }
+
+  return client;
+};
+
+module.exports = initializeRedisClient();

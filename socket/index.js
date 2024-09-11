@@ -1,6 +1,6 @@
 const socketIO = require("socket.io");
 const redis = require("../db/redis");
-const { socketMiddleware } = require("../common/constant.js");
+const { socketMiddleware, tryCatch } = require("../common/constant.js");
 
 const {
   chatList,
@@ -15,10 +15,10 @@ const {
 } = require("../app/services/auth.js");
 
 const {
-  markAsRead,
   sendMessage,
   getChatMessage,
-  markAsDelivered,
+  createWithDelivered,
+  createWithDeliveredAndRead,
 } = require("../app/services/message.js");
 
 let io;
@@ -50,7 +50,7 @@ const handleUserConnectionAndDisconnection = async (socket, status) => {
     //       });
     //     }
     //   } catch (err) {
-    //     console.error(`Error notifying contact ${contact}:`, err);
+    //     console.log(`Error notifying contact ${contact}:`, err);
     //   }
     // });
     // await Promise.all(contactPromises);
@@ -60,65 +60,95 @@ const handleUserConnectionAndDisconnection = async (socket, status) => {
 };
 
 // Handle sending messages
-const handleSendMessage = (socket) => async (data, callback) => {
-  const { _id } = socket.user;
-  const { message: content, chatId, type, receiverId, isGroup } = data;
-  let message = await sendMessage({
-    senderId: _id,
-    chatId,
-    content,
-    type,
-  });
+const handleSendMessage =
+  (socket) =>
+  async ({ message: content, chatId, type, receiverId, isGroup }) => {
+    try {
+      const { _id } = socket.user;
+      let message = null;
+      let messageBody = {
+        sender: _id,
+        chat: chatId,
+        content,
+        type,
+      };
 
-  if (!isGroup) {
-    if (await redis.get(receiverId)) {
-      message = await markAsDelivered(message._id, receiverId);
+      if (!isGroup) {
+        if (await hasUserOpenedSameChat(receiverId, chatId)) {
+          message = await createWithDeliveredAndRead({
+            body: messageBody,
+            receiverId,
+          });
+        } else if (await redis.get(receiverId)) {
+          message = await createWithDelivered({
+            body: messageBody,
+            receiverId,
+          });
+        } else {
+          console.log("hi");
+          message = await sendMessage(messageBody);
+        }
+      } else {
+      }
+
+      const updatedChat = await updateChatLastMessages(chatId, message._id);
+      io.to(chatId).emit("message", { message, updatedChat });
+    } catch (error) {
+      console.log(error);
     }
-  } else {
-  }
-
-  const updatedChat = await updateChatLastMessages(chatId, message._id);
-  io.to(chatId).emit("message", { message, updatedChat });
-};
+  };
 
 // Handle retrieving chat messages
 const handleGetChatMessages = (socket) => async (chatId, callback) => {
-  socket.join(chatId);
-  const chatMessages = await getChatMessage(chatId);
-  callback(chatMessages || []);
+  try {
+    socket.join(chatId);
+    const chatMessages = await getChatMessage(chatId);
+    callback(chatMessages || []);
+  } catch (error) {
+    console.log(error);
+  }
 };
 
 // Handle creating a new chat
 const handleCreateNewChat = (socket) => async (receiverId, callback) => {
-  const chat = await createNewChat(socket.user._id, receiverId);
-  const messages = await getChatMessage(chat._id);
-  callback({
-    chat,
-    messages,
-  });
+  try {
+    const chat = await createNewChat(socket.user._id, receiverId);
+    const messages = await getChatMessage(chat._id);
+    callback({
+      chat,
+      messages,
+    });
+  } catch (error) {
+    console.log(error);
+  }
 };
 
 // Handle retrieving chat list
 const handleChatList = (socket) => async (callback) => {
-  const list = await chatList(socket.user._id);
-  callback(list || []);
+  try {
+    const list = await chatList(socket.user._id);
+    callback(list || []);
+  } catch (error) {
+    console.log(error);
+  }
 };
 
 // Handle retrieving all users list
 const handleGetAllUserList = (socket) => async (callback) => {
-  const list = await getAll(socket.user._id);
-  callback(list);
-};
-
-const handleMarkAsRead = (socket) => async (messageId, userId, senderId) => {
-  let message = await markAsRead(messageId, userId);
-  if (userList[senderId]) {
-    io.to(userList[senderId]).emit("updateMessage", message);
+  try {
+    const list = await getAll(socket.user._id);
+    callback(list);
+  } catch (error) {
+    console.log(error);
   }
 };
 
 const handleMarkAllAsRead = () => async (callBack) => {
-  // const { _id } = socket.user;
+  try {
+    // const { _id } = socket.user;
+  } catch (error) {
+    console.log(error);
+  }
 };
 
 // Main handler for all socket connections
@@ -132,7 +162,6 @@ const handleConnections = (socket) => {
   // socket.on("createNewChat", handleCreateNewChat(socket));
   socket.on("getAllUserList", handleGetAllUserList(socket));
   socket.on("getChatMessages", handleGetChatMessages(socket));
-  // socket.on("markAsRead", handleMarkAsRead(socket));
   // socket.on("markAllAsRead", handleMarkAllAsRead(socket));
 
   // Handle disconnection event
@@ -151,4 +180,19 @@ module.exports = (server) => {
 
   io.use(socketMiddleware);
   io.on("connection", handleConnections);
+};
+
+const hasUserOpenedSameChat = async (userId, chatId) => {
+  let socketId = await redis.get(userId);
+  if (socketId) {
+    let users = io.sockets.adapter.rooms.get(chatId);
+    if (users) {
+      users = [...users];
+      if (users.includes(socketId)) {
+        return true;
+      }
+    }
+  } else {
+    return false;
+  }
 };

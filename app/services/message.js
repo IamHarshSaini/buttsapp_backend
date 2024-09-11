@@ -3,13 +3,7 @@ const { tryCatch } = require("../../common/constant");
 
 // Send a message
 exports.sendMessage = tryCatch(async (body) => {
-  const { senderId, chatId, content, type } = body;
-  const message = new Message({
-    sender: senderId,
-    chat: chatId,
-    content,
-    type,
-  });
+  const message = new Message(body);
   await message.save();
   return message;
 });
@@ -19,34 +13,41 @@ exports.getChatMessage = tryCatch(async (chatId) => {
   return msgs || [];
 });
 
-exports.markAsDelivered = tryCatch(async (messageId, userId) => {
-  return await Message.findByIdAndUpdate(
-    messageId,
-    {
-      $addToSet: {
-        deliveredTo: {
-          userId: userId,
-          isDelivered: true,
-          deliveredAt: new Date(),
-        },
+exports.createWithDeliveredAndRead = async ({ body, receiverId }) => {
+  try {
+    body["deliveredTo"] = [
+      {
+        userId: receiverId,
+        isDelivered: true,
+        deliveredAt: new Date(),
       },
-    },
-    { new: true }
-  );
-});
+    ];
+    body["readBy"] = [
+      {
+        userId: receiverId,
+        isRead: true,
+        readAt: new Date(),
+      },
+    ];
+    const message = new Message(body);
+    return await message.save();
+  } catch (error) {
+    console.error("Error saving message:", error);
+  }
+};
 
-exports.markAsRead = tryCatch(async (messageId, userId) => {
-  return await Message.findByIdAndUpdate(
-    messageId,
-    {
-      $addToSet: {
-        readBy: {
-          userId: userId,
-          isRead: true,
-          readAt: new Date(),
-        },
+exports.createWithDelivered = async ({ body, receiverId }) => {
+  try {
+    body["deliveredTo"] = [
+      {
+        userId: receiverId,
+        isDelivered: true,
+        deliveredAt: new Date(),
       },
-    },
-    { new: true }
-  );
-});
+    ];
+    const message = new Message(body);
+    return await message.save();
+  } catch (error) {
+    console.error("Error saving message:", error);
+  }
+};

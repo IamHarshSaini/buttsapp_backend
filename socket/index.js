@@ -1,6 +1,6 @@
-const socketIO = require("socket.io");
 const redis = require("../db/redis");
-const { socketMiddleware, tryCatch } = require("../common/constant.js");
+const socketIO = require("socket.io");
+const { socketMiddleware } = require("../common/constant.js");
 
 const {
   chatList,
@@ -38,7 +38,7 @@ const handleUserConnectionAndDisconnection = async (socket, status) => {
     const contacts = await getUserContacts(_id);
     await setOnlineOrOffline(_id, status);
 
-    const lastSeen = Date.now();
+    // const lastSeen = Date.now();
     // const contactPromises = contacts.map(async (contact) => {
     //   try {
     //     const isUserOnline = await redis.get(contact);
@@ -66,6 +66,8 @@ const handleSendMessage =
     try {
       const { _id } = socket.user;
       let message = null;
+      let updatedChat = null;
+
       let messageBody = {
         sender: _id,
         chat: chatId,
@@ -73,26 +75,33 @@ const handleSendMessage =
         type,
       };
 
+      const [hasUserOpenedSameChatRes, isUserOnline] = await Promise.all([
+        hasUserOpenedSameChat(receiverId, chatId),
+        redis.get(receiverId),
+      ]);
+
       if (!isGroup) {
-        if (await hasUserOpenedSameChat(receiverId, chatId)) {
+        if (hasUserOpenedSameChatRes) {
           message = await createWithDeliveredAndRead({
             body: messageBody,
             receiverId,
           });
-        } else if (await redis.get(receiverId)) {
+
+          updatedChat = await updateChatLastMessages(chatId, message._id);
+          io.to(chatId).emit("message", { message, updatedChat });
+
+          console.log(updatedChat)
+
+        } else if (isUserOnline) {
           message = await createWithDelivered({
             body: messageBody,
             receiverId,
           });
         } else {
-          console.log("hi");
           message = await sendMessage(messageBody);
         }
       } else {
       }
-
-      const updatedChat = await updateChatLastMessages(chatId, message._id);
-      io.to(chatId).emit("message", { message, updatedChat });
     } catch (error) {
       console.log(error);
     }

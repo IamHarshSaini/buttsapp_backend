@@ -1,8 +1,8 @@
 const userModel = require("../models/User");
-const { tryCatch } = require("../../common/constant");
+const { expressTryCatch } = require("../../common/constant");
 let userSelect = "-isVerified -createdAt -updatedAt -contacts -groups";
 
-exports.getAll = tryCatch(async function (id) {
+exports.getAll = expressTryCatch(async function (id) {
   try {
     if (id) {
       return (users = await userModel
@@ -16,7 +16,7 @@ exports.getAll = tryCatch(async function (id) {
   }
 });
 
-exports.add = tryCatch(async function (body) {
+exports.add = expressTryCatch(async function (body) {
   if (!body?.email) throw "email is required!";
   let user = await userModel.findOne({ email: body.email }).select(userSelect);
   if (user) {
@@ -28,7 +28,7 @@ exports.add = tryCatch(async function (body) {
   }
 });
 
-exports.setOnlineOrOffline = tryCatch(async (id, status) => {
+exports.setOnlineOrOffline = async (id, status) => {
   try {
     let body = {
       isOnline: status,
@@ -40,26 +40,34 @@ exports.setOnlineOrOffline = tryCatch(async (id, status) => {
   } catch (error) {
     return error;
   }
-});
+};
 
-exports.addNewUserToContactList = tryCatch(async (userId, contactId) => {
-  const currentUser = await userModel.findById(userId);
-  const newContact = await userModel.findById(contactId);
-  if (!currentUser || !newContact) {
-    return "User not found";
+exports.addNewUserToContactList = async (userId, contactId) => {
+  try {
+    const currentUser = await userModel.findById(userId);
+    const newContact = await userModel.findById(contactId);
+    if (!currentUser || !newContact) {
+      return "User not found";
+    }
+    if (currentUser.contacts.includes(contactId)) {
+      return "User is already in contacts";
+    }
+    currentUser.contacts.push(contactId);
+    await currentUser.save();
+    return {
+      message: "Contact added successfully",
+      contacts: currentUser.contacts,
+    };
+  } catch (error) {
+    console.log(error);
   }
-  if (currentUser.contacts.includes(contactId)) {
-    return "User is already in contacts";
-  }
-  currentUser.contacts.push(contactId);
-  await currentUser.save();
-  return {
-    message: "Contact added successfully",
-    contacts: currentUser.contacts,
-  };
-});
+};
 
-exports.getUserContacts = tryCatch(async (id) => {
-  let user = await userModel.findOne({ _id: id }).select("contacts");
-  return user?.contacts || [];
-});
+exports.getUserContacts = async (id) => {
+  try {
+    let user = await userModel.findOne({ _id: id }).select("contacts");
+    return user?.contacts || [];
+  } catch (error) {
+    console.log(error);
+  }
+};

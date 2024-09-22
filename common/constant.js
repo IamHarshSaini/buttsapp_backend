@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const { jwtDecode } = require('jwt-decode');
+const jwt = require("jsonwebtoken");
+const { jwtDecode } = require("jwt-decode");
 
 exports.jwtDecode = (token) => {
   try {
@@ -11,7 +11,7 @@ exports.jwtDecode = (token) => {
 
 exports.jwtEncode = (details) => {
   try {
-    return jwt.sign(JSON.stringify(details), 'shh');
+    return jwt.sign(JSON.stringify(details), "shh");
   } catch (error) {
     return error;
   }
@@ -22,23 +22,23 @@ exports.socketMiddleware = (socket, next) => {
     if (socket?.handshake?.query?.token) {
       const decoded = jwtDecode(socket.handshake.query.token);
       if (decoded?.email) {
-        socket['user'] = decoded;
+        socket["user"] = decoded;
         next();
       } else {
-        throw new Error('not authorized');
+        throw new Error("not authorized");
       }
     } else {
-      throw new Error('not authorized');
+      throw new Error("not authorized");
     }
   } catch (error) {
     console.log(error);
-    const err = new Error('not authorized');
-    err.data = { content: 'Please login first' };
+    const err = new Error("not authorized");
+    err.data = { content: "Please login first" };
     next(err);
   }
 };
 
-exports.tryCatch =
+exports.expressTryCatch =
   (fnc) =>
   async (...args) => {
     try {
@@ -49,13 +49,13 @@ exports.tryCatch =
         message: error.message || error,
       });
       const [, response] = args;
-      if (response && typeof response.send === 'function') {
+      if (response && typeof response.send === "function") {
         response.send({
           error: true,
           message: error.message || error,
         });
       } else {
-        return error.message || 'Server not working';
+        return error.message || "Server not working";
       }
     }
   };

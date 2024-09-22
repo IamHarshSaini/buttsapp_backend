@@ -1,17 +1,24 @@
 const Message = require("../models/Message");
-const { tryCatch } = require("../../common/constant");
 
 // Send a message
-exports.sendMessage = tryCatch(async (body) => {
-  const message = new Message(body);
-  await message.save();
-  return message;
-});
+exports.sendMessage = async (body) => {
+  try {
+    const message = new Message(body);
+    await message.save();
+    return message;
+  } catch (error) {
+    console.error("Error saving message:", error);
+  }
+};
 
-exports.getChatMessage = tryCatch(async (chatId) => {
-  let msgs = await Message.find({ chat: chatId }).sort({ createdAt: -1 });
-  return msgs || [];
-});
+exports.getChatMessage = async (chatId) => {
+  try {
+    let msgs = await Message.find({ chat: chatId }).sort({ createdAt: -1 });
+    return msgs;
+  } catch (error) {
+    console.error("Error getting message:", error);
+  }
+};
 
 exports.createWithDeliveredAndRead = async ({ body, receiverId }) => {
   try {

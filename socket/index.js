@@ -6,6 +6,7 @@ const {
   chatList,
   createNewChat,
   updateChatLastMessages,
+  updateChatLastMessagesAndUnReadCount,
 } = require("../app/services/chat.js");
 
 const {
@@ -14,12 +15,7 @@ const {
   setOnlineOrOffline,
 } = require("../app/services/auth.js");
 
-const {
-  sendMessage,
-  getChatMessage,
-  createWithDelivered,
-  createWithDeliveredAndRead,
-} = require("../app/services/message.js");
+const { sendMessage, getChatMessage } = require("../app/services/message.js");
 
 let io;
 
@@ -35,77 +31,33 @@ const handleUserConnectionAndDisconnection = async (socket, status) => {
       console.log(`${name} Disconnected`);
     }
     // Update user status and notify contacts
-    const contacts = await getUserContacts(_id);
-    await setOnlineOrOffline(_id, status);
+    const [contacts, updateStatus] = await Promise.all([
+      getUserContacts(_id),
+      setOnlineOrOffline(_id, status),
+    ]);
 
-    // const lastSeen = Date.now();
-    // const contactPromises = contacts.map(async (contact) => {
-    //   try {
-    //     const isUserOnline = await redis.get(contact);
-    //     if (isUserOnline) {
-    //       io.to(isUserOnline).emit("userStatusUpdate", {
-    //         userId: _id,
-    //         status: status,
-    //         lastSeen: lastSeen,
-    //       });
-    //     }
-    //   } catch (err) {
-    //     console.log(`Error notifying contact ${contact}:`, err);
-    //   }
-    // });
-    // await Promise.all(contactPromises);
+    if (contacts?.length > 0) {
+      const lastSeen = Date.now();
+      const contactPromises = contacts.map(async (contact) => {
+        try {
+          const isUserOnline = await redis.get(contact?.toString());
+          if (isUserOnline) {
+            io.to(isUserOnline).emit("userStatusUpdate", {
+              userId: _id,
+              status: status,
+              lastSeen: lastSeen,
+            });
+          }
+        } catch (err) {
+          console.log(`Error notifying contact ${contact}:`, err);
+        }
+      });
+      await Promise.all(contactPromises);
+    }
   } catch (e) {
     console.log(e);
   }
 };
-
-// Handle sending messages
-const handleSendMessage =
-  (socket) =>
-  async ({ message: content, chatId, type, receiverId, isGroup }) => {
-    try {
-      const { _id } = socket.user;
-      let message = null;
-      let updatedChat = null;
-
-      let messageBody = {
-        sender: _id,
-        chat: chatId,
-        content,
-        type,
-      };
-
-      const [hasUserOpenedSameChatRes, isUserOnline] = await Promise.all([
-        hasUserOpenedSameChat(receiverId, chatId),
-        redis.get(receiverId),
-      ]);
-
-      if (!isGroup) {
-        if (hasUserOpenedSameChatRes) {
-          message = await createWithDeliveredAndRead({
-            body: messageBody,
-            receiverId,
-          });
-
-          updatedChat = await updateChatLastMessages(chatId, message._id);
-          io.to(chatId).emit("message", { message, updatedChat });
-
-          console.log(updatedChat)
-
-        } else if (isUserOnline) {
-          message = await createWithDelivered({
-            body: messageBody,
-            receiverId,
-          });
-        } else {
-          message = await sendMessage(messageBody);
-        }
-      } else {
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
 // Handle retrieving chat messages
 const handleGetChatMessages = (socket) => async (chatId, callback) => {
@@ -118,15 +70,69 @@ const handleGetChatMessages = (socket) => async (chatId, callback) => {
   }
 };
 
+// Handle sending messages
+const handleSendMessage =
+  (socket) =>
+  async ({ message: content, chatId, type, receiverId, isGroup }) => {
+    try {
+      let messageBody = {
+        sender: socket["user"]["_id"],
+        chat: chatId,
+        content,
+        type,
+      };
+
+      const [hasUserOpenedSameChatRes, isUserOnline] = await Promise.all([
+        hasUserOpenedSameChat(receiverId, chatId),
+        redis.get(receiverId),
+      ]);
+
+      let message = await sendMessage({
+        receiverId,
+        isRead: hasUserOpenedSameChatRes,
+        isDelivered: isUserOnline ? true : false,
+        body: messageBody,
+      });
+
+      let updatedChat = null;
+      if (hasUserOpenedSameChatRes) {
+        updatedChat = await updateChatLastMessages(chatId, message._id);
+      } else {
+        updatedChat = await updateChatLastMessagesAndUnReadCount({
+          chatId,
+          messageId: message["_id"],
+          receiverId,
+        });``
+      }
+
+      io.to(chatId).emit("message", { message, updatedChat });
+
+      if (isUserOnline && !hasUserOpenedSameChatRes) {
+        io.to(isUserOnline).emit("updateChat", { updatedChat });
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
 // Handle creating a new chat
 const handleCreateNewChat = (socket) => async (receiverId, callback) => {
   try {
     const chat = await createNewChat(socket.user._id, receiverId);
-    const messages = await getChatMessage(chat._id);
-    callback({
-      chat,
-      messages,
-    });
+    const chatId = chat["chat"]["_id"]?.toString();
+    if (!chat["new"]) {
+      const messages = await getChatMessage(chatId);
+      callback({
+        chat: chat.chat,
+        messages,
+      });
+    } else {
+      callback({
+        chat: chat.chat,
+        messages: [],
+      });
+    }
+    socket.join(chatId);
   } catch (error) {
     console.log(error);
   }
@@ -152,13 +158,12 @@ const handleGetAllUserList = (socket) => async (callback) => {
   }
 };
 
-const handleMarkAllAsRead = () => async (callBack) => {
-  try {
-    // const { _id } = socket.user;
-  } catch (error) {
-    console.log(error);
-  }
-};
+// const handleMarkAllAsRead = () => async (callBack) => {
+//   try {
+//   } catch (error) {
+//     console.log(error);
+//   }
+// };
 
 // Main handler for all socket connections
 const handleConnections = (socket) => {
@@ -168,7 +173,7 @@ const handleConnections = (socket) => {
   // Bind socket events to handlers
   socket.on("chatList", handleChatList(socket));
   socket.on("sendMessage", handleSendMessage(socket));
-  // socket.on("createNewChat", handleCreateNewChat(socket));
+  socket.on("createNewChat", handleCreateNewChat(socket));
   socket.on("getAllUserList", handleGetAllUserList(socket));
   socket.on("getChatMessages", handleGetChatMessages(socket));
   // socket.on("markAllAsRead", handleMarkAllAsRead(socket));

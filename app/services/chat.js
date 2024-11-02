@@ -1,41 +1,60 @@
 const ChatModel = require("../models/Chat");
-const { addNewUserToContactList } = require("./auth");
+const { addNewUserToContactList } = require("../services/auth");
 
 exports.createNewChat = async (senderId, receiverId) => {
   try {
     const existingChat = await ChatModel.findOne({
       isGroup: false,
       members: { $all: [senderId, receiverId], $size: 2 },
-    });
+    })
+      .populate({
+        path: "members unreadCounts",
+        select: ["name", "profilePicture", "isOnline", "lastSeen"],
+        match: { _id: { $ne: senderId } },
+      })
+      .populate({
+        path: "lastMessage",
+        select: ["status", "type", "content", "createdAt"],
+        populate: {
+          path: "sender",
+          select: ["name"],
+        },
+      })
+      .populate({
+        path: "group",
+        select: ["groupPicture", "name"],
+      });
+
     if (existingChat) {
-      let chatInfo = existingChat.toObject();
-      if (!chatInfo?.isGroup) {
-        chatInfo["chatMember"] = chatInfo["members"][0];
-      }
-      delete chatInfo["members"];
-      return chatInfo;
+      return { chat: existingChat, new: false };
     } else {
       let newChat = new ChatModel({ members: [senderId, receiverId] });
-      await newChat.save();
-      let chatInfo = await ChatModel.findOne({ _id: newChat._id })
-        .select("isGroup lastMessage unreadCounts")
+      await Promise.all([
+        newChat.save(),
+        addNewUserToContactList(senderId, receiverId),
+        addNewUserToContactList(receiverId, senderId),
+      ]);
+      let chat = await ChatModel.findOne({
+        _id: newChat._id,
+      })
         .populate({
           path: "members unreadCounts",
           select: ["name", "profilePicture", "isOnline", "lastSeen"],
           match: { _id: { $ne: senderId } },
         })
-        .exec();
-
-      chatInfo = chatInfo.toObject();
-      if (!chatInfo?.isGroup) {
-        chatInfo["chatMember"] = chatInfo["members"][0];
-      }
-      delete chatInfo["members"];
-      await Promise.all([
-        addNewUserToContactList(senderId, receiverId),
-        addNewUserToContactList(receiverId, senderId),
-      ]);
-      return chatInfo;
+        .populate({
+          path: "lastMessage",
+          select: ["status", "type", "content", "createdAt"],
+          populate: {
+            path: "sender",
+            select: ["name"],
+          },
+        })
+        .populate({
+          path: "group",
+          select: ["groupPicture", "name"],
+        });
+      return { chat, new: true };
     }
   } catch (error) {
     console.log(error);
@@ -48,7 +67,6 @@ exports.chatList = async (id) => {
       members: id,
       lastMessage: { $ne: null },
     })
-      .select("isGroup lastMessage unreadCounts")
       .populate({
         path: "members unreadCounts",
         select: ["name", "profilePicture", "isOnline", "lastSeen"],
@@ -79,8 +97,74 @@ exports.updateChatLastMessages = async (chatId, messageId) => {
       chatId,
       { lastMessage: messageId },
       { new: true }
+    ).lean();
+    return await ChatModel.findById(updatedChat["_id"])
+      .populate({
+        path: "members unreadCounts",
+        select: ["name", "profilePicture", "isOnline", "lastSeen"],
+      })
+      .populate({
+        path: "lastMessage",
+        select: ["status", "type", "content", "createdAt"],
+        populate: {
+          path: "sender",
+          select: ["name"],
+        },
+      })
+      .populate({
+        path: "group",
+        select: ["groupPicture", "name"],
+      });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.updateChatLastMessagesAndUnReadCount = async ({
+  chatId,
+  messageId,
+  receiverId,
+}) => {
+  try {
+    let updatedChat = await ChatModel.findByIdAndUpdate(
+      chatId,
+      { lastMessage: messageId },
+      { new: true }
+    ).lean();
+
+    const userUnreadCount = updatedChat.unreadCounts.find(
+      (count) => count?.userId?.toString() === receiverId
     );
-    return updatedChat;
+
+    if (userUnreadCount) {
+      await ChatModel.updateOne(
+        { _id: chatId, "unreadCounts.userId": receiverId },
+        { $inc: { "unreadCounts.$.count": 1 } }
+      );
+    } else {
+      await ChatModel.updateOne(
+        { _id: chatId },
+        { $push: { unreadCounts: { userId: receiverId, count: 1 } } }
+      );
+    }
+
+    return await ChatModel.findById(updatedChat["_id"])
+      .populate({
+        path: "members unreadCounts",
+        select: ["name", "profilePicture", "isOnline", "lastSeen"],
+      })
+      .populate({
+        path: "lastMessage",
+        select: ["status", "type", "content", "createdAt"],
+        populate: {
+          path: "sender",
+          select: ["name"],
+        },
+      })
+      .populate({
+        path: "group",
+        select: ["groupPicture", "name"],
+      });
   } catch (error) {
     console.log(error);
   }
